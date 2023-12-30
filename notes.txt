@@ -1,0 +1,60 @@
+next:    Decoding multiple instructions and suffixes - MAR 5
+last:    Instruction decoding on the 8086 - MAR 2
+current: 
+
+-------------------------------------------------------------------------------
+    TODO
+-------------------------------------------------------------------------------
+
+-
+
+-------------------------------------------------------------------------------
+    Always keep in mind
+-------------------------------------------------------------------------------
+
+How to make a program fast?
+- Reduce number of instructions
+- Increase speed of instruction
+By:
+- Reduce waste
+- IPC\ILP
+- SIMD
+- Cache
+- Multithreading
+
+What does the code I write turns into at CPU level?
+
+-------------------------------------------------------------------------------
+    Why programs get slow?
+-------------------------------------------------------------------------------
+
+- Waste
+- ICP (Instructions per clock), ILP (Instruction level paralellism)
+- Cache (memory bandwidth?)
+- SIMD
+- Multithreading
+
+-------------------------------------------------------------------------------
+    Cache 
+-------------------------------------------------------------------------------
+
+- This data veries from chip to chip, this is just an example.
+  Chip info in https://en.wikichip.org/wiki/WikiChip
+
+    Cache levels:
+    L1 (Level 1) per core ~ takes 3 to 4 cycles ~ 64 bytes/cycle ~ 32kbs
+
+    L2 (Level 2) per core ~ takes 14 cycles ~ 256kbs
+
+    L3 (Level 3) shared by cores ~ takes 80 cycles ~ 8mbs
+
+    Main memory ~ 16gbs
+
+- How to be efficient with the cache:
+    - Do as much operations as possible to each piece of data when you load it
+    so it's loaded less often. 
+    - Don't request data to the cache more often than necessary.
+    - Minimize the number of times I have to read and write this data from\to 
+    memory.
+
+-------------------------------------------------------------------------------

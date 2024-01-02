@@ -1,12 +1,12 @@
-next:    Decoding multiple instructions and suffixes - MAR 5
-last:    Instruction decoding on the 8086 - MAR 2
+next:    Monday Q&A #4 (2023-03-06) - MAR 6
+last:    Decoding multiple instructions and suffixes - MAR 5
 current: 
 
 -------------------------------------------------------------------------------
     TODO
 -------------------------------------------------------------------------------
 
--
+- Challenges for Decoding multiple instructions and suffixes 
 
 -------------------------------------------------------------------------------
     Always keep in mind

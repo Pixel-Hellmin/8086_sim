@@ -45,3 +45,7 @@ mov al, [bx + si + 4999]
 mov [bx + di], cx
 mov [bp + si], cl
 mov [bp], ch
+
+; Immediate-to-register/memory
+mov [bp + di], byte 7
+mov [di + 901], word 347

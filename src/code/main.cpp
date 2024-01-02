@@ -17,8 +17,9 @@ struct instruction {
     u8 opcode;
 };
 
-global_variable instruction RegMemToFromReg = { 6, 0b00100010 };
-global_variable instruction ImmToReg        = { 4, 0b00001011 };
+global_variable instruction MovRegMemToFromReg = { 6, 0b00100010 };
+global_variable instruction MovImmToRegMem     = { 7, 0b01100011 };
+global_variable instruction MovImmToReg        = { 4, 0b00001011 };
 
 global_variable char Registers[][8][3] = {
     {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"},
@@ -100,7 +101,7 @@ int main(int argc, char *argv[])
         u8 first_byte  = buffer[byte_index];
         u8 second_byte = buffer[byte_index + 1];
 
-        if (match_instruction(first_byte, RegMemToFromReg)) {
+        if (match_instruction(first_byte, MovRegMemToFromReg)) {
 
             field d_field   = { 1, 6 };
             field w_field   = { 1, 7 };
@@ -167,7 +168,83 @@ int main(int argc, char *argv[])
             }
 
 
-        } else if (match_instruction(first_byte, ImmToReg)) {
+        } else if (match_instruction(first_byte, MovImmToRegMem)) {
+
+            field w_field   = { 1, 7 };
+            field mod_field = { 2, 0 };
+            field rm_field  = { 3, 5 };
+
+            u8 w   = decode_field(w_field,   first_byte);
+            u8 mod = decode_field(mod_field, second_byte);
+            u8 rm  = decode_field(rm_field,  second_byte);
+
+            char dest[32];
+            if (mod == 0b00000011) {
+
+                strcpy(dest, Registers[w][rm]);
+
+            } else {
+                if (mod == 0b00000000) {
+                    if (rm == 0b00000110) {
+                        strcpy(dest, "que hacer????");
+                        byte_index += 2;
+                    } else {
+                        strcpy(dest, EffectiveAddresses[rm]);
+                        strcat(dest, "]");
+                    }
+                } else if (mod == 0b00000001) {
+
+                    strcpy(dest, EffectiveAddresses[rm]);
+
+                    u8 disp = buffer[byte_index + 2];
+                    if (disp) {
+                        strcat(dest, " + ");
+                        sprintf(dest + strlen(dest), "%d", disp);
+                    }
+                    strcat(dest, "]");
+
+                    byte_index++;
+
+                } else if (mod == 0b00000010) {
+
+                    strcpy(dest, EffectiveAddresses[rm]);
+
+                    u8 disp_lo = buffer[byte_index + 2];
+                    u8 disp_h  = buffer[byte_index + 3];
+                    u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+                    if (disp) {
+                        strcat(dest, " + ");
+                        sprintf(dest + strlen(dest), "%d", disp);
+                    }
+                    strcat(dest, "]");
+
+                    byte_index += 2;
+
+                }
+            }
+
+            char src[32];
+            if (w) {
+                strcpy(src, "word ");
+                
+                u8 disp_lo = buffer[byte_index + 2];
+                u8 disp_h  = buffer[byte_index + 3];
+                u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+                sprintf(src + strlen(src), "%d", disp);
+
+                byte_index += 2;
+            } else {
+                strcpy(src, "byte ");
+
+                u8 disp = buffer[byte_index + 2];
+                sprintf(src + strlen(src), "%d", disp);
+
+                byte_index++;
+            }
+
+            printf("mov %s, %s\n", dest, src);
+
+        } else if (match_instruction(first_byte, MovImmToReg)) {
 
             field w_field   = { 1, 4 };
             field reg_field = { 3, 5 };

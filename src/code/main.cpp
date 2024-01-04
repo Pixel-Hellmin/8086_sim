@@ -6,7 +6,9 @@
 #define global_variable static 
 
 typedef unsigned char u8;
+typedef char          i8;
 typedef uint16_t      u16;
+typedef int16_t       i16;
 
 struct field {
     u8 length;
@@ -20,6 +22,17 @@ struct instruction {
 global_variable instruction MovRegMemToFromReg = { 6, 0b00100010 };
 global_variable instruction MovImmToRegMem     = { 7, 0b01100011 };
 global_variable instruction MovImmToReg        = { 4, 0b00001011 };
+
+global_variable instruction AddRegMemWithRegToEither = { 6, 0b00000000 };
+global_variable instruction SubRegMemWithRegToEither = { 6, 0b00001010 };
+global_variable instruction CmpRegMemWithRegToEither = { 6, 0b00001110 };
+
+global_variable instruction AddImmToAcc   = { 7, 0b00000010 };
+global_variable instruction SubImmFromAcc = { 7, 0b00010110 };
+global_variable instruction CmpImmWithAcc = { 7, 0b00011110 };
+
+global_variable instruction AddSubCmpImmXRegMem = { 6, 0b00100000 };
+
 
 global_variable char Registers[][8][3] = {
     {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"},
@@ -89,6 +102,87 @@ u8 match_instruction(u8 byte, instruction instruction)
     return (byte >> 8 - instruction.length) == instruction.opcode;
 }
 
+size_t assemble_reg_mem_to_either_instruction(
+    char *buffer,
+    size_t byte_index,
+    char *result
+) {
+
+    u8 first_byte  = buffer[byte_index];
+    u8 second_byte = buffer[byte_index + 1];
+
+    field d_field   = { 1, 6 };
+    field w_field   = { 1, 7 };
+    field mod_field = { 2, 0 };
+    field reg_field = { 3, 2 };
+    field rm_field  = { 3, 5 };
+
+    u8 w   = decode_field(w_field,   first_byte);
+    u8 d   = decode_field(d_field,   first_byte);
+    u8 mod = decode_field(mod_field, second_byte);
+    u8 reg = decode_field(reg_field, second_byte);
+    u8 rm  = decode_field(rm_field,  second_byte);
+
+    size_t offset = 0;
+
+    // TODO(Fermin): ALL this next section is also done in other instructions
+    char * dest = Registers[w][reg];
+    char src[32];
+    if (mod == 0b00000011) {
+        strcpy(src, Registers[w][rm]);
+    } else {
+        if (mod == 0b00000000) {
+            if (rm == 0b00000110) {
+                u8 disp_lo = buffer[byte_index + 2];
+                u8 disp_h  = buffer[byte_index + 3];
+                u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+                if (disp) {
+                    strcpy(dest, "[");
+                    sprintf(dest + strlen(dest), "%d", disp);
+                    strcat(dest, "]");
+                }
+                offset += 2;
+            } else {
+                strcpy(src, EffectiveAddresses[rm]);
+                strcat(src, "]");
+            }
+        } else if (mod == 0b00000001) {
+            strcpy(src, EffectiveAddresses[rm]);
+
+            u8 disp = buffer[byte_index + 2];
+            if (disp) {
+                strcat(src, " + ");
+                sprintf(src + strlen(src), "%d", disp);
+            }
+            strcat(src, "]");
+
+            offset++;
+        } else if (mod == 0b00000010) {
+            strcpy(src, EffectiveAddresses[rm]);
+
+            u8 disp_lo = buffer[byte_index + 2];
+            u8 disp_h  = buffer[byte_index + 3];
+            u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+            if (disp) {
+                strcat(src, " + ");
+                sprintf(src + strlen(src), "%d", disp);
+            }
+            strcat(src, "]");
+
+            offset += 2;
+        }
+    }
+
+    if (!d) {
+        sprintf(result, "%s, %s\n", src, dest);
+    } else {
+        sprintf(result, "%s, %s\n", dest, src);
+    }
+
+    return offset;
+
+}
+
 int main(int argc, char *argv[])
 {
     printf("bits 16\n\n");
@@ -103,70 +197,10 @@ int main(int argc, char *argv[])
 
         if (match_instruction(first_byte, MovRegMemToFromReg)) {
 
-            field d_field   = { 1, 6 };
-            field w_field   = { 1, 7 };
-            field mod_field = { 2, 0 };
-            field reg_field = { 3, 2 };
-            field rm_field  = { 3, 5 };
-
-            u8 w   = decode_field(w_field,   first_byte);
-            u8 d   = decode_field(d_field,   first_byte);
-            u8 mod = decode_field(mod_field, second_byte);
-            u8 reg = decode_field(reg_field, second_byte);
-            u8 rm  = decode_field(rm_field,  second_byte);
-
-            char * dest = Registers[w][reg];
-            char src[32];
-            if (mod == 0b00000011) {
-
-                strcpy(src, Registers[w][rm]);
-
-            } else {
-                if (mod == 0b00000000) {
-                    if (rm == 0b00000110) {
-                        strcpy(src, "que hacer????");
-                        byte_index += 2;
-                    } else {
-                        strcpy(src, EffectiveAddresses[rm]);
-                        strcat(src, "]");
-                    }
-                } else if (mod == 0b00000001) {
-
-                    strcpy(src, EffectiveAddresses[rm]);
-
-                    u8 disp = buffer[byte_index + 2];
-                    if (disp) {
-                        strcat(src, " + ");
-                        sprintf(src + strlen(src), "%d", disp);
-                    }
-                    strcat(src, "]");
-
-                    byte_index++;
-
-                } else if (mod == 0b00000010) {
-
-                    strcpy(src, EffectiveAddresses[rm]);
-
-                    u8 disp_lo = buffer[byte_index + 2];
-                    u8 disp_h  = buffer[byte_index + 3];
-                    u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
-                    if (disp) {
-                        strcat(src, " + ");
-                        sprintf(src + strlen(src), "%d", disp);
-                    }
-                    strcat(src, "]");
-
-                    byte_index += 2;
-
-                }
-            }
-
-            if (!d) {
-                printf("mov %s, %s\n", src, dest);
-            } else {
-                printf("mov %s, %s\n", dest, src);
-            }
-
+            char result[32];
+            byte_index += assemble_reg_mem_to_either_instruction(
+                          buffer, byte_index, result);
+            printf("mov %s", result);
 
         } else if (match_instruction(first_byte, MovImmToRegMem)) {
 
@@ -180,20 +214,24 @@ int main(int argc, char *argv[])
 
             char dest[32];
             if (mod == 0b00000011) {
-
                 strcpy(dest, Registers[w][rm]);
-
             } else {
                 if (mod == 0b00000000) {
                     if (rm == 0b00000110) {
-                        strcpy(dest, "que hacer????");
+                        u8 disp_lo = buffer[byte_index + 2];
+                        u8 disp_h  = buffer[byte_index + 3];
+                        u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+                        if (disp) {
+                            strcpy(dest, "[");
+                            sprintf(dest + strlen(dest), "%d", disp);
+                            strcat(dest, "]");
+                        }
                         byte_index += 2;
                     } else {
                         strcpy(dest, EffectiveAddresses[rm]);
                         strcat(dest, "]");
                     }
                 } else if (mod == 0b00000001) {
-
                     strcpy(dest, EffectiveAddresses[rm]);
 
                     u8 disp = buffer[byte_index + 2];
@@ -204,9 +242,7 @@ int main(int argc, char *argv[])
                     strcat(dest, "]");
 
                     byte_index++;
-
                 } else if (mod == 0b00000010) {
-
                     strcpy(dest, EffectiveAddresses[rm]);
 
                     u8 disp_lo = buffer[byte_index + 2];
@@ -219,7 +255,6 @@ int main(int argc, char *argv[])
                     strcat(dest, "]");
 
                     byte_index += 2;
-
                 }
             }
 
@@ -267,6 +302,207 @@ int main(int argc, char *argv[])
             }
 
             printf("mov %s, %s\n", dest, src);
+
+        } else if (match_instruction(first_byte, AddRegMemWithRegToEither)) {
+
+            char result[32];
+            byte_index += assemble_reg_mem_to_either_instruction(
+                          buffer, byte_index, result);
+            printf("add %s", result);
+
+        } else if (match_instruction(first_byte, SubRegMemWithRegToEither)) {
+
+            char result[32];
+            byte_index += assemble_reg_mem_to_either_instruction(
+                          buffer, byte_index, result);
+            printf("sub %s", result);
+
+        } else if (match_instruction(first_byte, CmpRegMemWithRegToEither)) {
+
+            char result[32];
+            byte_index += assemble_reg_mem_to_either_instruction(
+                          buffer, byte_index, result);
+            printf("cmp %s", result);
+
+        } else if (match_instruction(first_byte, AddImmToAcc)) {
+
+            field w_field   = { 1, 7 };
+            u8 w   = decode_field(w_field,   first_byte);
+
+            char dest[3];
+            char src[32];
+            if (w) { 
+                u8 disp_lo = buffer[byte_index + 1];
+                u8 disp_h  = buffer[byte_index + 2];
+                i16 disp = (i16)disp_h << 8 | (i16)disp_lo;
+                sprintf(src, "%d", disp);
+
+                strcpy(dest, "ax");
+
+                byte_index++;
+            } else {
+                i8 disp = buffer[byte_index + 1];
+                sprintf(src, "%d", disp);
+
+                strcpy(dest, "al");
+            }
+
+            printf("add %s, %s\n", dest, src);
+
+        } else if (match_instruction(first_byte, SubImmFromAcc)) {
+
+            field w_field   = { 1, 7 };
+            u8 w   = decode_field(w_field,   first_byte);
+
+            char dest[3];
+            char src[32];
+            if (w) { 
+                u8 disp_lo = buffer[byte_index + 1];
+                u8 disp_h  = buffer[byte_index + 2];
+                i16 disp = (i16)disp_h << 8 | (i16)disp_lo;
+                sprintf(src, "%d", disp);
+                
+                strcpy(dest, "ax");
+
+                byte_index++;
+            } else {
+                i8 disp = buffer[byte_index + 1];
+                sprintf(src, "%d", disp);
+
+                strcpy(dest, "al");
+            }
+
+            printf("sub %s, %s\n", dest, src);
+
+        } else if (match_instruction(first_byte, CmpImmWithAcc)) {
+
+            field w_field   = { 1, 7 };
+            u8 w   = decode_field(w_field,   first_byte);
+
+            char dest[3];
+            char src[32];
+            if (w) { 
+                u8 disp_lo = buffer[byte_index + 1];
+                u8 disp_h  = buffer[byte_index + 2];
+                i16 disp = (i16)disp_h << 8 | (i16)disp_lo;
+                sprintf(src, "%d", disp);
+
+                strcpy(dest, "ax");
+
+                byte_index++;
+            } else {
+                i8 disp = buffer[byte_index + 1];
+                sprintf(src, "%d", disp);
+
+                strcpy(dest, "al");
+            }
+
+            printf("cmp %s, %s\n", dest, src);
+
+        } else if (match_instruction(first_byte, AddSubCmpImmXRegMem)) {
+
+            field s_field   = { 1, 6 };
+            field w_field   = { 1, 7 };
+            field mod_field = { 2, 0 };
+            field op_field  = { 3, 2 };
+            field rm_field  = { 3, 5 };
+
+            u8 s   = decode_field(s_field,   first_byte);
+            u8 w   = decode_field(w_field,   first_byte);
+            u8 mod = decode_field(mod_field, second_byte);
+            u8 op  = decode_field(op_field,  second_byte);
+            u8 rm  = decode_field(rm_field,  second_byte);
+
+            char dest[32];
+            if (mod == 0b00000011) {
+
+                strcpy(dest, Registers[w][rm]);
+
+            } else {
+                if (mod == 0b00000000) {
+                    if (rm == 0b00000110) {
+                        u8 disp_lo = buffer[byte_index + 2];
+                        u8 disp_h  = buffer[byte_index + 3];
+                        u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+                        if (disp) {
+                            strcpy(dest, "[");
+                            sprintf(dest + strlen(dest), "%d", disp);
+                            strcat(dest, "]");
+                        }
+                        byte_index += 2;
+                    } else {
+                        strcpy(dest, EffectiveAddresses[rm]);
+                        strcat(dest, "]");
+                    }
+                } else if (mod == 0b00000001) {
+
+                    strcpy(dest, EffectiveAddresses[rm]);
+
+                    u8 disp = buffer[byte_index + 2];
+                    if (disp) {
+                        strcat(dest, " + ");
+                        sprintf(dest + strlen(dest), "%d", disp);
+                    }
+                    strcat(dest, "]");
+
+                    byte_index++;
+
+                } else if (mod == 0b00000010) {
+
+                    strcpy(dest, EffectiveAddresses[rm]);
+
+                    u8 disp_lo = buffer[byte_index + 2];
+                    u8 disp_h  = buffer[byte_index + 3];
+                    u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+                    if (disp) {
+                        strcat(dest, " + ");
+                        sprintf(dest + strlen(dest), "%d", disp);
+                    }
+                    strcat(dest, "]");
+
+                    byte_index += 2;
+
+                }
+            }
+
+            char inst[4];
+            if (op == 0b00000000) {
+                strcpy(inst, "add");
+            } else if (op == 0b00000101) {
+                strcpy(inst, "sub");
+            } else if (op == 0b00000111) {
+                strcpy(inst, "cmp");
+            }
+
+            char src[32];
+            if (w) {
+                strcat(inst, " word");
+
+                if (!s) {
+                    u8 disp_lo = buffer[byte_index + 2];
+                    u8 disp_h  = buffer[byte_index + 3];
+                    i16 disp = (i16)disp_h << 8 | (i16)disp_lo;
+                    sprintf(src, "%d", disp);
+
+                    byte_index += 2;
+                } else {
+                    i8 disp_lo = buffer[byte_index + 2];
+                    i16 disp = (i16)disp_lo;
+                    sprintf(src, "%d", disp);
+
+                    byte_index++;
+                }
+
+            } else {
+                strcat(inst, " byte");
+
+                i8 disp = buffer[byte_index + 2];
+                sprintf(src, "%d", disp);
+
+                byte_index++;
+            }
+
+            printf("%s %s, %s\n", inst, dest, src);
 
         }
     }

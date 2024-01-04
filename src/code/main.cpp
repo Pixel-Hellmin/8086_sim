@@ -89,25 +89,6 @@ long read_file(char **buffer, char *file_name, char *mode)
     return file_size;
 }
 
-void debug_print_field(field field, u8 byte)
-{
-    for (int bit = 0; bit < field.length; ++bit)
-    {
-        putchar((byte & (1 << (7 - field.start_bit - bit))) ? '1' : '0');
-    }
-    putchar(' ');
-}
-
-void debug_print_byte(u8 byte)
-{
-
-    for (int bit = 7; bit >= 0; --bit)
-    {
-        putchar((byte & (1 << bit)) ? '1' : '0');
-    }
-    putchar(' ');
-}
-
 u8 decode_field(field field, u8 byte)
 {
     u8 result = byte   << field.start_bit;
@@ -117,90 +98,62 @@ u8 decode_field(field field, u8 byte)
     return result;
 }
 
-u8 match_instruction(u8 byte, instruction instruction)
+u8 decode_instruction(u8 byte, instruction instruction)
 {
     return (byte >> 8 - instruction.length) == instruction.opcode;
 }
 
-size_t assemble_reg_mem_to_either_instruction(
+u16 get_u16_at(char *buffer)
+{
+    u8 disp_lo = buffer[0];
+    u8 disp_h  = buffer[1];
+    return (u16)disp_h << 8 | (u16)disp_lo;
+}
+
+size_t decode_address_or_register(
     char *buffer,
-    size_t byte_index,
-    char *result
+    char *result,
+    u8 w,
+    u8 mod,
+    u8 rm
 ) {
-
-    u8 first_byte  = buffer[byte_index];
-    u8 second_byte = buffer[byte_index + 1];
-
-    field d_field   = { 1, 6 };
-    field w_field   = { 1, 7 };
-    field mod_field = { 2, 0 };
-    field reg_field = { 3, 2 };
-    field rm_field  = { 3, 5 };
-
-    u8 w   = decode_field(w_field,   first_byte);
-    u8 d   = decode_field(d_field,   first_byte);
-    u8 mod = decode_field(mod_field, second_byte);
-    u8 reg = decode_field(reg_field, second_byte);
-    u8 rm  = decode_field(rm_field,  second_byte);
-
     size_t offset = 0;
-
-    // TODO(Fermin): ALL this next section is also done in other instructions
-    char * dest = Registers[w][reg];
-    char src[32];
     if (mod == 0b00000011) {
-        strcpy(src, Registers[w][rm]);
-    } else {
-        if (mod == 0b00000000) {
-            if (rm == 0b00000110) {
-                u8 disp_lo = buffer[byte_index + 2];
-                u8 disp_h  = buffer[byte_index + 3];
-                u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
-                if (disp) {
-                    strcpy(dest, "[");
-                    sprintf(dest + strlen(dest), "%d", disp);
-                    strcat(dest, "]");
-                }
-                offset += 2;
-            } else {
-                strcpy(src, EffectiveAddresses[rm]);
-                strcat(src, "]");
-            }
-        } else if (mod == 0b00000001) {
-            strcpy(src, EffectiveAddresses[rm]);
-
-            u8 disp = buffer[byte_index + 2];
+        strcpy(result, Registers[w][rm]);
+    } else if (mod == 0b00000000) {
+        if (rm == 0b00000110) {
+            u16 disp = get_u16_at(&buffer[2]);
             if (disp) {
-                strcat(src, " + ");
-                sprintf(src + strlen(src), "%d", disp);
+                strcpy(result, "[");
+                sprintf(result + strlen(result), "%d", disp);
+                strcat(result, "]");
             }
-            strcat(src, "]");
-
-            offset++;
-        } else if (mod == 0b00000010) {
-            strcpy(src, EffectiveAddresses[rm]);
-
-            u8 disp_lo = buffer[byte_index + 2];
-            u8 disp_h  = buffer[byte_index + 3];
-            u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
-            if (disp) {
-                strcat(src, " + ");
-                sprintf(src + strlen(src), "%d", disp);
-            }
-            strcat(src, "]");
-
             offset += 2;
+        } else {
+            strcpy(result, EffectiveAddresses[rm]);
+            strcat(result, "]");
         }
-    }
-
-    if (!d) {
-        sprintf(result, "%s, %s\n", src, dest);
-    } else {
-        sprintf(result, "%s, %s\n", dest, src);
+    } else if (mod == 0b00000001) {
+            strcpy(result, EffectiveAddresses[rm]);
+            u8 disp = buffer[2];
+            if (disp) {
+                strcat(result, " + ");
+                sprintf(result + strlen(result), "%d", disp);
+            }
+            strcat(result, "]");
+            offset++;
+    } else if (mod == 0b00000010) {
+            strcpy(result, EffectiveAddresses[rm]);
+            u16 disp = get_u16_at(&buffer[2]);
+            if (disp) {
+                strcat(result, " + ");
+                sprintf(result + strlen(result), "%d", disp);
+            }
+            strcat(result, "]");
+            offset += 2;
     }
 
     return offset;
-
 }
 
 int main(int argc, char *argv[])
@@ -215,14 +168,32 @@ int main(int argc, char *argv[])
         u8 first_byte  = buffer[byte_index];
         u8 second_byte = buffer[byte_index + 1];
 
-        if (match_instruction(first_byte, MovRegMemToFromReg)) {
+        if (decode_instruction(first_byte, MovRegMemToFromReg)) {
 
-            char result[32];
-            byte_index += assemble_reg_mem_to_either_instruction(
-                          buffer, byte_index, result);
-            printf("mov %s", result);
+            field d_field   = { 1, 6 };
+            field w_field   = { 1, 7 };
+            field mod_field = { 2, 0 };
+            field reg_field = { 3, 2 };
+            field rm_field  = { 3, 5 };
 
-        } else if (match_instruction(first_byte, MovImmToRegMem)) {
+            u8 w   = decode_field(w_field,   first_byte);
+            u8 d   = decode_field(d_field,   first_byte);
+            u8 mod = decode_field(mod_field, second_byte);
+            u8 reg = decode_field(reg_field, second_byte);
+            u8 rm  = decode_field(rm_field,  second_byte);
+
+            char * dest = Registers[w][reg];
+            char src[32];
+            byte_index += decode_address_or_register(&buffer[byte_index],
+                                                     src, w, mod, rm);
+
+            if (!d) {
+                printf("mov %s, %s\n", src, dest);
+            } else {
+                printf("mov %s, %s\n", dest, src);
+            }
+
+        } else if (decode_instruction(first_byte, MovImmToRegMem)) {
 
             field w_field   = { 1, 7 };
             field mod_field = { 2, 0 };
@@ -233,73 +204,24 @@ int main(int argc, char *argv[])
             u8 rm  = decode_field(rm_field,  second_byte);
 
             char dest[32];
-            if (mod == 0b00000011) {
-                strcpy(dest, Registers[w][rm]);
-            } else {
-                if (mod == 0b00000000) {
-                    if (rm == 0b00000110) {
-                        u8 disp_lo = buffer[byte_index + 2];
-                        u8 disp_h  = buffer[byte_index + 3];
-                        u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
-                        if (disp) {
-                            strcpy(dest, "[");
-                            sprintf(dest + strlen(dest), "%d", disp);
-                            strcat(dest, "]");
-                        }
-                        byte_index += 2;
-                    } else {
-                        strcpy(dest, EffectiveAddresses[rm]);
-                        strcat(dest, "]");
-                    }
-                } else if (mod == 0b00000001) {
-                    strcpy(dest, EffectiveAddresses[rm]);
-
-                    u8 disp = buffer[byte_index + 2];
-                    if (disp) {
-                        strcat(dest, " + ");
-                        sprintf(dest + strlen(dest), "%d", disp);
-                    }
-                    strcat(dest, "]");
-
-                    byte_index++;
-                } else if (mod == 0b00000010) {
-                    strcpy(dest, EffectiveAddresses[rm]);
-
-                    u8 disp_lo = buffer[byte_index + 2];
-                    u8 disp_h  = buffer[byte_index + 3];
-                    u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
-                    if (disp) {
-                        strcat(dest, " + ");
-                        sprintf(dest + strlen(dest), "%d", disp);
-                    }
-                    strcat(dest, "]");
-
-                    byte_index += 2;
-                }
-            }
-
+            byte_index += decode_address_or_register(&buffer[byte_index],
+                                                     dest, w, mod, rm);
             char src[32];
             if (w) {
                 strcpy(src, "word ");
-                
-                u8 disp_lo = buffer[byte_index + 2];
-                u8 disp_h  = buffer[byte_index + 3];
-                u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+                u16 disp = get_u16_at(&buffer[byte_index + 2]);
                 sprintf(src + strlen(src), "%d", disp);
-
                 byte_index += 2;
             } else {
                 strcpy(src, "byte ");
-
                 u8 disp = buffer[byte_index + 2];
                 sprintf(src + strlen(src), "%d", disp);
-
                 byte_index++;
             }
 
             printf("mov %s, %s\n", dest, src);
 
-        } else if (match_instruction(first_byte, MovImmToReg)) {
+        } else if (decode_instruction(first_byte, MovImmToReg)) {
 
             field w_field   = { 1, 4 };
             field reg_field = { 3, 5 };
@@ -310,11 +232,8 @@ int main(int argc, char *argv[])
             char * dest = Registers[w][reg];
             char src[32];
             if (w) {
-                u8 disp_lo = buffer[byte_index + 1];
-                u8 disp_h  = buffer[byte_index + 2];
-                u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
+                u16 disp = get_u16_at(&buffer[byte_index + 1]);
                 sprintf(src, "%d", disp);
-
                 byte_index++;
             } else {
                 u8 disp = buffer[byte_index + 1];
@@ -323,53 +242,102 @@ int main(int argc, char *argv[])
 
             printf("mov %s, %s\n", dest, src);
 
-        } else if (match_instruction(first_byte, AddRegMemWithRegToEither)) {
+        } else if (decode_instruction(first_byte, AddRegMemWithRegToEither)) {
 
-            char result[32];
-            byte_index += assemble_reg_mem_to_either_instruction(
-                          buffer, byte_index, result);
-            printf("add %s", result);
-
-        } else if (match_instruction(first_byte, SubRegMemWithRegToEither)) {
-
-            char result[32];
-            byte_index += assemble_reg_mem_to_either_instruction(
-                          buffer, byte_index, result);
-            printf("sub %s", result);
-
-        } else if (match_instruction(first_byte, CmpRegMemWithRegToEither)) {
-
-            char result[32];
-            byte_index += assemble_reg_mem_to_either_instruction(
-                          buffer, byte_index, result);
-            printf("cmp %s", result);
-
-        } else if (match_instruction(first_byte, AddImmToAcc)) {
-
+            field d_field   = { 1, 6 };
             field w_field   = { 1, 7 };
+            field mod_field = { 2, 0 };
+            field reg_field = { 3, 2 };
+            field rm_field  = { 3, 5 };
+
             u8 w   = decode_field(w_field,   first_byte);
+            u8 d   = decode_field(d_field,   first_byte);
+            u8 mod = decode_field(mod_field, second_byte);
+            u8 reg = decode_field(reg_field, second_byte);
+            u8 rm  = decode_field(rm_field,  second_byte);
+
+            char * dest = Registers[w][reg];
+            char src[32];
+            byte_index += decode_address_or_register(&buffer[byte_index],
+                                                     src, w, mod, rm);
+
+            if (!d) {
+                printf("add %s, %s\n", src, dest);
+            } else {
+                printf("add %s, %s\n", dest, src);
+            }
+
+        } else if (decode_instruction(first_byte, SubRegMemWithRegToEither)) {
+
+            field d_field   = { 1, 6 };
+            field w_field   = { 1, 7 };
+            field mod_field = { 2, 0 };
+            field reg_field = { 3, 2 };
+            field rm_field  = { 3, 5 };
+
+            u8 w   = decode_field(w_field,   first_byte);
+            u8 d   = decode_field(d_field,   first_byte);
+            u8 mod = decode_field(mod_field, second_byte);
+            u8 reg = decode_field(reg_field, second_byte);
+            u8 rm  = decode_field(rm_field,  second_byte);
+
+            char * dest = Registers[w][reg];
+            char src[32];
+            byte_index += decode_address_or_register(&buffer[byte_index],
+                                                     src, w, mod, rm);
+
+            if (!d) {
+                printf("sub %s, %s\n", src, dest);
+            } else {
+                printf("sub %s, %s\n", dest, src);
+            }
+
+        } else if (decode_instruction(first_byte, CmpRegMemWithRegToEither)) {
+
+            field d_field   = { 1, 6 };
+            field w_field   = { 1, 7 };
+            field mod_field = { 2, 0 };
+            field reg_field = { 3, 2 };
+            field rm_field  = { 3, 5 };
+
+            u8 w   = decode_field(w_field,   first_byte);
+            u8 d   = decode_field(d_field,   first_byte);
+            u8 mod = decode_field(mod_field, second_byte);
+            u8 reg = decode_field(reg_field, second_byte);
+            u8 rm  = decode_field(rm_field,  second_byte);
+
+            char * dest = Registers[w][reg];
+            char src[32];
+            byte_index += decode_address_or_register(&buffer[byte_index],
+                                                     src, w, mod, rm);
+
+            if (!d) {
+                printf("cmp %s, %s\n", src, dest);
+            } else {
+                printf("cmp %s, %s\n", dest, src);
+            }
+
+        } else if (decode_instruction(first_byte, AddImmToAcc)) {
+
+            field w_field = { 1, 7 };
+            u8 w = decode_field(w_field, first_byte);
 
             char dest[3];
             char src[32];
             if (w) { 
-                u8 disp_lo = buffer[byte_index + 1];
-                u8 disp_h  = buffer[byte_index + 2];
-                i16 disp = (i16)disp_h << 8 | (i16)disp_lo;
+                i16 disp = (i16)get_u16_at(&buffer[byte_index + 1]);
                 sprintf(src, "%d", disp);
-
                 strcpy(dest, "ax");
-
                 byte_index++;
             } else {
                 i8 disp = buffer[byte_index + 1];
                 sprintf(src, "%d", disp);
-
                 strcpy(dest, "al");
             }
 
             printf("add %s, %s\n", dest, src);
 
-        } else if (match_instruction(first_byte, SubImmFromAcc)) {
+        } else if (decode_instruction(first_byte, SubImmFromAcc)) {
 
             field w_field   = { 1, 7 };
             u8 w   = decode_field(w_field,   first_byte);
@@ -377,49 +345,39 @@ int main(int argc, char *argv[])
             char dest[3];
             char src[32];
             if (w) { 
-                u8 disp_lo = buffer[byte_index + 1];
-                u8 disp_h  = buffer[byte_index + 2];
-                i16 disp = (i16)disp_h << 8 | (i16)disp_lo;
+                i16 disp = (i16)get_u16_at(&buffer[byte_index + 1]);
                 sprintf(src, "%d", disp);
-                
                 strcpy(dest, "ax");
-
                 byte_index++;
             } else {
                 i8 disp = buffer[byte_index + 1];
                 sprintf(src, "%d", disp);
-
                 strcpy(dest, "al");
             }
 
             printf("sub %s, %s\n", dest, src);
 
-        } else if (match_instruction(first_byte, CmpImmWithAcc)) {
+        } else if (decode_instruction(first_byte, CmpImmWithAcc)) {
 
-            field w_field   = { 1, 7 };
-            u8 w   = decode_field(w_field,   first_byte);
+            field w_field = { 1, 7 };
+            u8 w = decode_field(w_field, first_byte);
 
             char dest[3];
             char src[32];
             if (w) { 
-                u8 disp_lo = buffer[byte_index + 1];
-                u8 disp_h  = buffer[byte_index + 2];
-                i16 disp = (i16)disp_h << 8 | (i16)disp_lo;
+                i16 disp = (i16)get_u16_at(&buffer[byte_index + 1]);
                 sprintf(src, "%d", disp);
-
                 strcpy(dest, "ax");
-
                 byte_index++;
             } else {
                 i8 disp = buffer[byte_index + 1];
                 sprintf(src, "%d", disp);
-
                 strcpy(dest, "al");
             }
 
             printf("cmp %s, %s\n", dest, src);
 
-        } else if (match_instruction(first_byte, AddSubCmpImmXRegMem)) {
+        } else if (decode_instruction(first_byte, AddSubCmpImmXRegMem)) {
 
             field s_field   = { 1, 6 };
             field w_field   = { 1, 7 };
@@ -434,56 +392,8 @@ int main(int argc, char *argv[])
             u8 rm  = decode_field(rm_field,  second_byte);
 
             char dest[32];
-            if (mod == 0b00000011) {
-
-                strcpy(dest, Registers[w][rm]);
-
-            } else {
-                if (mod == 0b00000000) {
-                    if (rm == 0b00000110) {
-                        u8 disp_lo = buffer[byte_index + 2];
-                        u8 disp_h  = buffer[byte_index + 3];
-                        u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
-                        if (disp) {
-                            strcpy(dest, "[");
-                            sprintf(dest + strlen(dest), "%d", disp);
-                            strcat(dest, "]");
-                        }
-                        byte_index += 2;
-                    } else {
-                        strcpy(dest, EffectiveAddresses[rm]);
-                        strcat(dest, "]");
-                    }
-                } else if (mod == 0b00000001) {
-
-                    strcpy(dest, EffectiveAddresses[rm]);
-
-                    u8 disp = buffer[byte_index + 2];
-                    if (disp) {
-                        strcat(dest, " + ");
-                        sprintf(dest + strlen(dest), "%d", disp);
-                    }
-                    strcat(dest, "]");
-
-                    byte_index++;
-
-                } else if (mod == 0b00000010) {
-
-                    strcpy(dest, EffectiveAddresses[rm]);
-
-                    u8 disp_lo = buffer[byte_index + 2];
-                    u8 disp_h  = buffer[byte_index + 3];
-                    u16 disp = (u16)disp_h << 8 | (u16)disp_lo;
-                    if (disp) {
-                        strcat(dest, " + ");
-                        sprintf(dest + strlen(dest), "%d", disp);
-                    }
-                    strcat(dest, "]");
-
-                    byte_index += 2;
-
-                }
-            }
+            byte_index += decode_address_or_register(&buffer[byte_index],
+                                                     dest, w, mod, rm);
 
             char inst[4];
             if (op == 0b00000000) {
@@ -497,72 +407,63 @@ int main(int argc, char *argv[])
             char src[32];
             if (w) {
                 strcat(inst, " word");
-
                 if (!s) {
-                    u8 disp_lo = buffer[byte_index + 2];
-                    u8 disp_h  = buffer[byte_index + 3];
-                    i16 disp = (i16)disp_h << 8 | (i16)disp_lo;
+                    i16 disp = (i16)get_u16_at(&buffer[byte_index + 2]);
                     sprintf(src, "%d", disp);
-
                     byte_index += 2;
                 } else {
-                    i8 disp_lo = buffer[byte_index + 2];
-                    i16 disp = (i16)disp_lo;
+                    i16 disp = (i16)buffer[byte_index + 2];
                     sprintf(src, "%d", disp);
-
                     byte_index++;
                 }
-
             } else {
                 strcat(inst, " byte");
-
                 i8 disp = buffer[byte_index + 2];
                 sprintf(src, "%d", disp);
-
                 byte_index++;
             }
 
             printf("%s %s, %s\n", inst, dest, src);
 
-        } else if (match_instruction(first_byte, JNZ)) {
+        } else if (decode_instruction(first_byte, JNZ)) {
             printf("jnz label\n");
-        } else if (match_instruction(first_byte, JE)) {
+        } else if (decode_instruction(first_byte, JE)) {
             printf("je label\n");
-        } else if (match_instruction(first_byte, JLE)) {
+        } else if (decode_instruction(first_byte, JLE)) {
             printf("jle label\n");
-        } else if (match_instruction(first_byte, JB)) {
+        } else if (decode_instruction(first_byte, JB)) {
             printf("jb label\n");
-        } else if (match_instruction(first_byte, JBE)) {
+        } else if (decode_instruction(first_byte, JBE)) {
             printf("jbe label\n");
-        } else if (match_instruction(first_byte, JP)) {
+        } else if (decode_instruction(first_byte, JP)) {
             printf("jp label\n");
-        } else if (match_instruction(first_byte, JO)) {
+        } else if (decode_instruction(first_byte, JO)) {
             printf("jo label\n");
-        } else if (match_instruction(first_byte, JS)) {
+        } else if (decode_instruction(first_byte, JS)) {
             printf("js label\n");
-        } else if (match_instruction(first_byte, JNE)) {
+        } else if (decode_instruction(first_byte, JNE)) {
             printf("jne label\n");
-        } else if (match_instruction(first_byte, JNL)) {
+        } else if (decode_instruction(first_byte, JNL)) {
             printf("jnl label\n");
-        } else if (match_instruction(first_byte, JG)) {
+        } else if (decode_instruction(first_byte, JG)) {
             printf("jg label\n");
-        } else if (match_instruction(first_byte, JNB)) {
+        } else if (decode_instruction(first_byte, JNB)) {
             printf("jnb label\n");
-        } else if (match_instruction(first_byte, JA)) {
+        } else if (decode_instruction(first_byte, JA)) {
             printf("ja label\n");
-        } else if (match_instruction(first_byte, JNP)) {
+        } else if (decode_instruction(first_byte, JNP)) {
             printf("jnp label\n");
-        } else if (match_instruction(first_byte, JNO)) {
+        } else if (decode_instruction(first_byte, JNO)) {
             printf("jno label\n");
-        } else if (match_instruction(first_byte, JNS)) {
+        } else if (decode_instruction(first_byte, JNS)) {
             printf("jns label\n");
-        } else if (match_instruction(first_byte, LOOP)) {
+        } else if (decode_instruction(first_byte, LOOP)) {
             printf("loop label\n");
-        } else if (match_instruction(first_byte, LOOPZ)) {
+        } else if (decode_instruction(first_byte, LOOPZ)) {
             printf("loopz label\n");
-        } else if (match_instruction(first_byte, LOOPNZ)) {
+        } else if (decode_instruction(first_byte, LOOPNZ)) {
             printf("loopnz label\n");
-        } else if (match_instruction(first_byte, JCXZ)) {
+        } else if (decode_instruction(first_byte, JCXZ)) {
             printf("jcxz label\n");
         }
     }

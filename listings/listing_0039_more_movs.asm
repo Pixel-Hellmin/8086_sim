@@ -46,6 +46,6 @@ mov [bx + di], cx
 mov [bp + si], cl
 mov [bp], ch
 
-; Immediate-to-register/memory
+; testing
 mov [bp + di], byte 7
 mov [di + 901], word 347

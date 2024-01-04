@@ -30,8 +30,28 @@ global_variable instruction CmpRegMemWithRegToEither = { 6, 0b00001110 };
 global_variable instruction AddImmToAcc   = { 7, 0b00000010 };
 global_variable instruction SubImmFromAcc = { 7, 0b00010110 };
 global_variable instruction CmpImmWithAcc = { 7, 0b00011110 };
-
 global_variable instruction AddSubCmpImmXRegMem = { 6, 0b00100000 };
+
+global_variable instruction JNZ    = { 8, 0b01110101 };
+global_variable instruction JE     = { 8, 0b01110100 };
+global_variable instruction JLE    = { 8, 0b01111110 };
+global_variable instruction JB     = { 8, 0b01110010 };
+global_variable instruction JBE    = { 8, 0b01110110 };
+global_variable instruction JP     = { 8, 0b01111010 };
+global_variable instruction JO     = { 8, 0b01110000 };
+global_variable instruction JS     = { 8, 0b01111000 };
+global_variable instruction JNE    = { 8, 0b01110101 };
+global_variable instruction JNL    = { 8, 0b01111101 };
+global_variable instruction JG     = { 8, 0b01111111 };
+global_variable instruction JNB    = { 8, 0b01110011 };
+global_variable instruction JA     = { 8, 0b01110111 };
+global_variable instruction JNP    = { 8, 0b01111011 };
+global_variable instruction JNO    = { 8, 0b01110001 };
+global_variable instruction JNS    = { 8, 0b01111001 };
+global_variable instruction LOOP   = { 8, 0b11100010 };
+global_variable instruction LOOPZ  = { 8, 0b11100001 };
+global_variable instruction LOOPNZ = { 8, 0b11100000 };
+global_variable instruction JCXZ   = { 8, 0b11100011 };
 
 
 global_variable char Registers[][8][3] = {
@@ -504,6 +524,46 @@ int main(int argc, char *argv[])
 
             printf("%s %s, %s\n", inst, dest, src);
 
+        } else if (match_instruction(first_byte, JNZ)) {
+            printf("jnz label\n");
+        } else if (match_instruction(first_byte, JE)) {
+            printf("je label\n");
+        } else if (match_instruction(first_byte, JLE)) {
+            printf("jle label\n");
+        } else if (match_instruction(first_byte, JB)) {
+            printf("jb label\n");
+        } else if (match_instruction(first_byte, JBE)) {
+            printf("jbe label\n");
+        } else if (match_instruction(first_byte, JP)) {
+            printf("jp label\n");
+        } else if (match_instruction(first_byte, JO)) {
+            printf("jo label\n");
+        } else if (match_instruction(first_byte, JS)) {
+            printf("js label\n");
+        } else if (match_instruction(first_byte, JNE)) {
+            printf("jne label\n");
+        } else if (match_instruction(first_byte, JNL)) {
+            printf("jnl label\n");
+        } else if (match_instruction(first_byte, JG)) {
+            printf("jg label\n");
+        } else if (match_instruction(first_byte, JNB)) {
+            printf("jnb label\n");
+        } else if (match_instruction(first_byte, JA)) {
+            printf("ja label\n");
+        } else if (match_instruction(first_byte, JNP)) {
+            printf("jnp label\n");
+        } else if (match_instruction(first_byte, JNO)) {
+            printf("jno label\n");
+        } else if (match_instruction(first_byte, JNS)) {
+            printf("jns label\n");
+        } else if (match_instruction(first_byte, LOOP)) {
+            printf("loop label\n");
+        } else if (match_instruction(first_byte, LOOPZ)) {
+            printf("loopz label\n");
+        } else if (match_instruction(first_byte, LOOPNZ)) {
+            printf("loopnz label\n");
+        } else if (match_instruction(first_byte, JCXZ)) {
+            printf("jcxz label\n");
         }
     }
 

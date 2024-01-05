@@ -1,5 +1,5 @@
-next:    Monday Q&A #4 (2023-03-06) - MAR 6
-last:    Decoding multiple instructions and suffixes - MAR 5
+last:    Monday Q&A #5 (2023-03-13) - MAR 13
+next:    8086 Decoder code review - MAR 5
 current: 
 
 -------------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 #include "main.h"
 
-long read_file(u8 **buffer, char *file_name, char *mode)
+static long read_file(u8 **buffer, char *file_name, char *mode)
 {
     FILE *file = {};
     if (fopen_s(&file, file_name, mode) != 0)
@@ -20,7 +20,7 @@ long read_file(u8 **buffer, char *file_name, char *mode)
     return bytes_read;
 }
 
-u8 decode_field(field field, u8 byte)
+static u8 decode_field(field field, u8 byte)
 {
     u8 result = byte   << field.start_bit;
     result    = result >> field.start_bit;
@@ -29,19 +29,19 @@ u8 decode_field(field field, u8 byte)
     return result;
 }
 
-u8 decode_instruction(u8 byte, instruction instruction)
+static u8 decode_instruction(u8 byte, instruction instruction)
 {
     return (byte >> 8 - instruction.length) == instruction.opcode;
 }
 
-u16 get_u16_at(u8 *buffer)
+static u16 get_u16_at(u8 *buffer)
 {
     u8 disp_lo = buffer[0];
     u8 disp_h  = buffer[1];
     return (u16)disp_h << 8 | (u16)disp_lo;
 }
 
-size_t decode_address_or_register(u8 *buffer, char *result, u8 w, u8 mod, u8 rm)
+static size_t decode_address_or_register(u8 *buffer, char *result, u8 w, u8 mod, u8 rm)
 {
     size_t offset = 0;
     switch (mod)

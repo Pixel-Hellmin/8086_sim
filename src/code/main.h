@@ -54,6 +54,12 @@ enum RegisterIndex
     count
 };
 
+enum InstructionFlag : u8
+{
+    zero = (1 << 0),
+    sign = (1 << 1),
+};
+
 global_variable inst_code MovRegMemToFromReg = { 6, 0b00100010 };
 global_variable inst_code MovImmToRegMem     = { 7, 0b01100011 };
 global_variable inst_code MovImmToReg        = { 4, 0b00001011 };

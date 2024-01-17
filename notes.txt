@@ -1,5 +1,5 @@
-last:    Monday Q&A #5 (2023-03-13) - MAR 13
-next:    8086 Decoder code review - MAR 5
+next:    Homework Poll - MAR 27
+last:    Simulating non memory movs - MAR 25
 current: 
 
 -------------------------------------------------------------------------------

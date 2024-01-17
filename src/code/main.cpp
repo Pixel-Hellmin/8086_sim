@@ -98,8 +98,39 @@ static size_t decode_address_or_register(u8 *buffer, char *result, u8 w, u8 mod,
     return offset;
 }
 
-static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *instruction, u16 *registers)
-{
+static void check_and_set_zero_flag(u8 *flags, u16 value) {
+
+    if(value == 0)
+    {
+        *flags |= InstructionFlag::zero;
+    }
+    else
+    {
+        *flags &= ~InstructionFlag::zero;
+    }
+}
+
+static void check_and_set_sign_flag(u8 *flags, u16 value) {
+
+    u16 high_bit = 0x8000;
+
+    if((u16)(value & high_bit) == high_bit)
+    {
+        *flags |= InstructionFlag::sign;
+    }
+    else
+    {
+        *flags &= ~InstructionFlag::sign;
+    }
+}
+
+static size_t decode_instruction(
+    u8 *buffer,
+    size_t byte_index,
+    instruction *instruction,
+    u16 *registers,
+    u8 *flags
+) {
     u8 first_byte  = buffer[byte_index];
     u8 second_byte = buffer[byte_index + 1];
 
@@ -207,12 +238,22 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             byte_index += decode_address_or_register(&buffer[byte_index],
                              instruction->dest, w, mod, rm);
             sprintf(instruction->src, "%s", RegisterNames[w][reg]);
+
+            registers[rm] = registers[rm] + registers[reg];
+
+            check_and_set_zero_flag(flags, registers[rm]);
+            check_and_set_sign_flag(flags, registers[rm]);
         }
         else
         {
             byte_index += decode_address_or_register(&buffer[byte_index],
                              instruction->src, w, mod, rm);
             sprintf(instruction->dest, "%s", RegisterNames[w][reg]);
+
+            registers[reg] = registers[reg] + registers[rm];
+            
+            check_and_set_zero_flag(flags, registers[reg]);
+            check_and_set_sign_flag(flags, registers[reg]);
         }
 
         instruction->type = instruction_type::add;
@@ -237,12 +278,22 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             byte_index += decode_address_or_register(&buffer[byte_index],
                                  instruction->dest, w, mod, rm);
             sprintf(instruction->src, "%s", RegisterNames[w][reg]);
+
+            registers[rm] = registers[rm] - registers[reg];
+            
+            check_and_set_zero_flag(flags, registers[rm]);
+            check_and_set_sign_flag(flags, registers[rm]);
         }
         else
         {
             byte_index += decode_address_or_register(&buffer[byte_index],
                                  instruction->src, w, mod, rm);
             sprintf(instruction->dest, "%s", RegisterNames[w][reg]);
+
+            registers[reg] = registers[reg] - registers[rm];
+            
+            check_and_set_zero_flag(flags, registers[reg]);
+            check_and_set_sign_flag(flags, registers[reg]);
         }
 
         instruction->type = instruction_type::sub;
@@ -266,12 +317,22 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             byte_index += decode_address_or_register(&buffer[byte_index],
                                  instruction->dest, w, mod, rm);
             sprintf(instruction->src, "%s", RegisterNames[w][reg]);
+
+            u16 result = registers[rm] - registers[reg];
+            
+            check_and_set_zero_flag(flags, result);
+            check_and_set_sign_flag(flags, result);
         }
         else
         {
             byte_index += decode_address_or_register(&buffer[byte_index],
                                  instruction->src, w, mod, rm);
             sprintf(instruction->dest, "%s", RegisterNames[w][reg]);
+
+            u16 result = registers[reg] - registers[rm];
+            
+            check_and_set_zero_flag(flags, result);
+            check_and_set_sign_flag(flags, result);
         }
 
         instruction->type = instruction_type::cmp;
@@ -286,6 +347,11 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             s16 imm = (s16)get_u16_at(&buffer[byte_index + 1]);
             sprintf(instruction->dest, "ax");
             sprintf(instruction->src, "%d", imm);
+
+            registers[RegisterIndex::ax] += imm;
+            check_and_set_zero_flag(flags, registers[RegisterIndex::ax]);
+            check_and_set_sign_flag(flags, registers[RegisterIndex::ax]);
+
             byte_index++;
         }
         else
@@ -293,6 +359,10 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             s8 imm = buffer[byte_index + 1];
             sprintf(instruction->dest, "al");
             sprintf(instruction->src, "%d", imm);
+
+            registers[RegisterIndex::ax] += (u16)imm;
+            check_and_set_zero_flag(flags, registers[RegisterIndex::ax]);
+            check_and_set_sign_flag(flags, registers[RegisterIndex::ax]);
         }
 
         instruction->type = instruction_type::add;
@@ -307,6 +377,11 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             s16 imm = (s16)get_u16_at(&buffer[byte_index + 1]);
             sprintf(instruction->dest, "ax");
             sprintf(instruction->src, "%d", imm);
+
+            registers[RegisterIndex::ax] -= imm;
+            check_and_set_zero_flag(flags, registers[RegisterIndex::ax]);
+            check_and_set_sign_flag(flags, registers[RegisterIndex::ax]);
+
             byte_index++;
         }
         else
@@ -314,6 +389,10 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             s8 imm = buffer[byte_index + 1];
             sprintf(instruction->dest, "al");
             sprintf(instruction->src, "%d", imm);
+
+            registers[RegisterIndex::ax] -= imm;
+            check_and_set_zero_flag(flags, registers[RegisterIndex::ax]);
+            check_and_set_sign_flag(flags, registers[RegisterIndex::ax]);
         }
 
         instruction->type = instruction_type::sub;
@@ -328,6 +407,11 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             s16 imm = (s16)get_u16_at(&buffer[byte_index + 1]);
             sprintf(instruction->dest, "ax");
             sprintf(instruction->src, "%d", imm);
+
+            u16 result = registers[RegisterIndex::ax] - imm;
+            check_and_set_zero_flag(flags, result);
+            check_and_set_sign_flag(flags, result);
+
             byte_index++;
         }
         else
@@ -335,6 +419,10 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
             s8 imm = buffer[byte_index + 1];
             sprintf(instruction->dest, "al");
             sprintf(instruction->src, "%d", imm);
+
+            u16 result = registers[RegisterIndex::ax] - (u16)imm;
+            check_and_set_zero_flag(flags, result);
+            check_and_set_sign_flag(flags, result);
         }
 
         instruction->type = instruction_type::cmp;
@@ -357,19 +445,6 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
         byte_index += decode_address_or_register(&buffer[byte_index],
                                                  dest, w, mod, rm);
 
-        if (op == 0b00000000)
-        {
-            instruction->type = instruction_type::add;
-        }
-        else if (op == 0b00000101)
-        {
-            instruction->type = instruction_type::sub;
-        }
-        else if (op == 0b00000111)
-        {
-            instruction->type = instruction_type::cmp;
-        }
-
         if (w)
         {
             s16 imm;
@@ -383,12 +458,58 @@ static size_t decode_instruction(u8 *buffer, size_t byte_index, instruction *ins
                 imm = (s16)buffer[byte_index + 2];
                 byte_index++;
             }
+
+            u16 result = 0;
+            if (op == 0b00000000)
+            {
+                instruction->type = instruction_type::add;
+                result = registers[rm] + imm;
+                registers[rm] = result;
+            }
+            else if (op == 0b00000101)
+            {
+                instruction->type = instruction_type::sub;
+                result = registers[rm] - imm;
+                registers[rm] = result;
+            }
+            else if (op == 0b00000111)
+            {
+                instruction->type = instruction_type::cmp;
+                result = registers[rm] - imm;
+            }
+
+            check_and_set_zero_flag(flags, result);
+            check_and_set_sign_flag(flags, result);
+
             sprintf(instruction->dest, "word %s", dest);
             sprintf(instruction->src, "%d", imm);
         }
         else
         {
             s8 imm = buffer[byte_index + 2];
+
+            u16 result = 0;
+            if (op == 0b00000000)
+            {
+                instruction->type = instruction_type::add;
+                result = registers[rm] + (u16)imm;
+                registers[rm] = result;
+            }
+            else if (op == 0b00000101)
+            {
+                instruction->type = instruction_type::sub;
+                result = registers[rm] - (u16)imm;
+                registers[rm] = result;
+            }
+            else if (op == 0b00000111)
+            {
+                instruction->type = instruction_type::cmp;
+                result = registers[rm] - (u16)imm;
+            }
+
+            check_and_set_zero_flag(flags, result);
+            check_and_set_sign_flag(flags, result);
+
             sprintf(instruction->dest, "byte %s", dest);
             sprintf(instruction->src, "%d", imm);
             byte_index++;
@@ -504,23 +625,8 @@ static void print_instruction(instruction *instruction)
     printf("%s\n", instruction->src);
 }
 
-int main(int argc, char *argv[])
+static void print_registers(u16 *registers, u8 flags)
 {
-    // Speed(Fermin): Instead of many prints, would it be 
-    // faster to write to a buffer and just print once?
-    printf("bits 16\n\n");
-
-    u8 *buffer = {};
-    long file_size = read_file(&buffer, argv[1], (char *)"rb");
-
-    u16 registers[8] = {};
-
-    for (size_t byte_index = 0; byte_index < file_size; byte_index += 2)
-    {
-        instruction instruction = {};
-        byte_index = decode_instruction(buffer, byte_index, &instruction, registers);
-        print_instruction(&instruction);
-    }
 
     printf("\nPrinting Registers\n");
     printf("%s: %d\n", RegisterNames[1][RegisterIndex::ax], registers[RegisterIndex::ax]);
@@ -531,6 +637,29 @@ int main(int argc, char *argv[])
     printf("%s: %d\n", RegisterNames[1][RegisterIndex::bp], registers[RegisterIndex::bp]);
     printf("%s: %d\n", RegisterNames[1][RegisterIndex::si], registers[RegisterIndex::si]);
     printf("%s: %d\n", RegisterNames[1][RegisterIndex::di], registers[RegisterIndex::di]);
+
+    printf("zero flag: %d\n", (flags & InstructionFlag::zero) >> 0);
+    printf("sign flag: %d\n", (flags & InstructionFlag::sign) >> 1);
+}
+
+int main(int argc, char *argv[])
+{
+    printf("bits 16\n\n");
+
+    u8 *buffer = {};
+    long file_size = read_file(&buffer, argv[1], (char *)"rb");
+
+    u16 registers[8] = {};
+    u8 flags = 0;
+
+    for (size_t byte_index = 0; byte_index < file_size; byte_index += 2)
+    {
+        instruction instruction = {};
+        byte_index = decode_instruction(buffer, byte_index, &instruction, registers, &flags);
+        print_instruction(&instruction);
+    }
+
+    print_registers(registers, flags);
 
     free(buffer);
     

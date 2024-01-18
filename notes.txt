@@ -1,5 +1,5 @@
-next:    Homework Poll - MAR 27
-last:    Simulating non memory movs - MAR 25
+next:    Monday Q&A #7 (2023-04-10) - APR 10
+last:    Simulating Conditional Jumps - APR 3
 current: 
 
 -------------------------------------------------------------------------------

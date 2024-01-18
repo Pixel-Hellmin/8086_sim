@@ -30,6 +30,28 @@ enum instruction_type
     add,
     sub,
     cmp,
+    jnz,
+    je,
+    jle,
+    jb,
+    jbe,
+    jp,
+    jo,
+    js,
+    jne,
+    jnl,
+    jg,
+    jnb,
+    ja,
+    jnp,
+    jno,
+    jns,
+    loop,
+    loopz,
+    loopnz,
+    jcxz,
+
+    inst_count
 };
 
 struct instruction
@@ -40,7 +62,7 @@ struct instruction
     char dest[32];
 };
 
-enum RegisterIndex
+enum register_index
 {
     ax,
     cx,
@@ -54,7 +76,7 @@ enum RegisterIndex
     count
 };
 
-enum InstructionFlag : u8
+enum instruction_flag : u8
 {
     zero = (1 << 0),
     sign = (1 << 1),
@@ -94,12 +116,22 @@ global_variable inst_code LOOPZ  = { 8, 0b11100001 };
 global_variable inst_code LOOPNZ = { 8, 0b11100000 };
 global_variable inst_code JCXZ   = { 8, 0b11100011 };
 
-global_variable char RegisterNames[][8][3] =
+global_variable char const RegisterNames[][8][3] =
 {
     {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"},
     {"ax", "cx", "dx", "bx", "sp", "bp", "si", "di"}
 };
-global_variable char EffectiveAddresses[][9] =
+
+global_variable char const EffectiveAddresses[][9] =
 {
     "[bx + si", "[bx + di", "[bp + si", "[bp + di", "[si", "[di", "[bp", "[bx"
 };
+
+global_variable char const InstructionMnemonics[instruction_type::inst_count][7] = 
+{
+    "mov", "add", "sub", "cmp", "jnz", "je", "jle",
+    "jb", "jbe", "jp", "jo", "js", "jne", "jnl", "jg",
+    "jnb", "ja", "jnp", "jno", "jns", "loop", "loopz",
+    "loopnz", "jcxz"
+};
+

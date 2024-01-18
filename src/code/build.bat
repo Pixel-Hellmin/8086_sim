@@ -30,7 +30,10 @@ for /f "tokens=1-3 delims=/:" %%a in ("%TIME%")  do (set starttime=%%a:%%b:%%c)
 @echo Compilation started %startdate% at %starttime%
 @echo:
 
-cl %CommonCompilerFlags% ..\src\code\main.cpp  /link %CommonLinkerFlags%
+REM del *.pbd > NUL 2> NUL
+REM echo WAITING FOR PBD > lock.tmp
+cl %CommonCompilerFlags% ..\src\code\main.cpp  /link -incremental:no -opt:ref %CommonLinkerFlags%
+REM del lock.tmp
 
 for /f "tokens=2-4 delims=/ " %%a in ('date /t') do (set finishdate=%%b-%%a-%%c)
 for /f "tokens=1-3 delims=/:" %%a in ("%TIME%") do (set finishtime=%%a:%%b:%%c)

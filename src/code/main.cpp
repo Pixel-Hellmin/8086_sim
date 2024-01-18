@@ -102,11 +102,11 @@ static void check_and_set_zero_flag(u8 *flags, u16 value) {
 
     if(value == 0)
     {
-        *flags |= InstructionFlag::zero;
+        *flags |= instruction_flag::zero;
     }
     else
     {
-        *flags &= ~InstructionFlag::zero;
+        *flags &= ~instruction_flag::zero;
     }
 }
 
@@ -116,11 +116,11 @@ static void check_and_set_sign_flag(u8 *flags, u16 value) {
 
     if((u16)(value & high_bit) == high_bit)
     {
-        *flags |= InstructionFlag::sign;
+        *flags |= instruction_flag::sign;
     }
     else
     {
-        *flags &= ~InstructionFlag::sign;
+        *flags &= ~instruction_flag::sign;
     }
 }
 
@@ -348,9 +348,9 @@ static size_t decode_instruction(
             sprintf(instruction->dest, "ax");
             sprintf(instruction->src, "%d", imm);
 
-            registers[RegisterIndex::ax] += imm;
-            check_and_set_zero_flag(flags, registers[RegisterIndex::ax]);
-            check_and_set_sign_flag(flags, registers[RegisterIndex::ax]);
+            registers[register_index::ax] += imm;
+            check_and_set_zero_flag(flags, registers[register_index::ax]);
+            check_and_set_sign_flag(flags, registers[register_index::ax]);
 
             byte_index++;
         }
@@ -360,9 +360,9 @@ static size_t decode_instruction(
             sprintf(instruction->dest, "al");
             sprintf(instruction->src, "%d", imm);
 
-            registers[RegisterIndex::ax] += (u16)imm;
-            check_and_set_zero_flag(flags, registers[RegisterIndex::ax]);
-            check_and_set_sign_flag(flags, registers[RegisterIndex::ax]);
+            registers[register_index::ax] += (u16)imm;
+            check_and_set_zero_flag(flags, registers[register_index::ax]);
+            check_and_set_sign_flag(flags, registers[register_index::ax]);
         }
 
         instruction->type = instruction_type::add;
@@ -378,9 +378,9 @@ static size_t decode_instruction(
             sprintf(instruction->dest, "ax");
             sprintf(instruction->src, "%d", imm);
 
-            registers[RegisterIndex::ax] -= imm;
-            check_and_set_zero_flag(flags, registers[RegisterIndex::ax]);
-            check_and_set_sign_flag(flags, registers[RegisterIndex::ax]);
+            registers[register_index::ax] -= imm;
+            check_and_set_zero_flag(flags, registers[register_index::ax]);
+            check_and_set_sign_flag(flags, registers[register_index::ax]);
 
             byte_index++;
         }
@@ -390,9 +390,9 @@ static size_t decode_instruction(
             sprintf(instruction->dest, "al");
             sprintf(instruction->src, "%d", imm);
 
-            registers[RegisterIndex::ax] -= imm;
-            check_and_set_zero_flag(flags, registers[RegisterIndex::ax]);
-            check_and_set_sign_flag(flags, registers[RegisterIndex::ax]);
+            registers[register_index::ax] -= imm;
+            check_and_set_zero_flag(flags, registers[register_index::ax]);
+            check_and_set_sign_flag(flags, registers[register_index::ax]);
         }
 
         instruction->type = instruction_type::sub;
@@ -408,7 +408,7 @@ static size_t decode_instruction(
             sprintf(instruction->dest, "ax");
             sprintf(instruction->src, "%d", imm);
 
-            u16 result = registers[RegisterIndex::ax] - imm;
+            u16 result = registers[register_index::ax] - imm;
             check_and_set_zero_flag(flags, result);
             check_and_set_sign_flag(flags, result);
 
@@ -420,7 +420,7 @@ static size_t decode_instruction(
             sprintf(instruction->dest, "al");
             sprintf(instruction->src, "%d", imm);
 
-            u16 result = registers[RegisterIndex::ax] - (u16)imm;
+            u16 result = registers[register_index::ax] - (u16)imm;
             check_and_set_zero_flag(flags, result);
             check_and_set_sign_flag(flags, result);
         }
@@ -517,83 +517,128 @@ static size_t decode_instruction(
     }
     else if (match_instruction(first_byte, JNZ))
     {
-        printf("jnz label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "$%d", offset + 2);
+        instruction->type = instruction_type::jnz;
+
+        if (!(*flags & instruction_flag::zero))
+        {
+            byte_index += offset;
+        }
     }
     else if (match_instruction(first_byte, JE))
     {
-        printf("je label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::je;
     }
     else if (match_instruction(first_byte, JLE))
     {
-        printf("jle label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jle;
     }
     else if (match_instruction(first_byte, JB))
     {
-        printf("jb label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jb;
     }
     else if (match_instruction(first_byte, JBE))
     {
-        printf("jbe label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jbe;
     }
     else if (match_instruction(first_byte, JP))
     {
-        printf("jp label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jp;
     }
     else if (match_instruction(first_byte, JO))
     {
-        printf("jo label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jo;
     }
     else if (match_instruction(first_byte, JS))
     {
-        printf("js label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::js;
     }
     else if (match_instruction(first_byte, JNE))
     {
-        printf("jne label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jne;
     }
     else if (match_instruction(first_byte, JNL))
     {
-        printf("jnl label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jnl;
     }
     else if (match_instruction(first_byte, JG))
     {
-        printf("jg label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jg;
     }
     else if (match_instruction(first_byte, JNB))
     {
-        printf("jnb label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jnb;
     }
     else if (match_instruction(first_byte, JA))
     {
-        printf("ja label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::ja;
     }
     else if (match_instruction(first_byte, JNP))
     {
-        printf("jnp label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jnp;
     }
     else if (match_instruction(first_byte, JNO))
     {
-        printf("jno label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jno;
     }
     else if (match_instruction(first_byte, JNS))
     {
-        printf("jns label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jns;
     }
     else if (match_instruction(first_byte, LOOP))
     {
-        printf("loop label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::loop;
     }
     else if (match_instruction(first_byte, LOOPZ))
     {
-        printf("loopz label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::loopz;
     }
     else if (match_instruction(first_byte, LOOPNZ))
     {
-        printf("loopnz label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::loopnz;
     }
     else if (match_instruction(first_byte, JCXZ))
     {
-        printf("jcxz label\n");
+        s8 offset = buffer[byte_index + 1];
+        sprintf(instruction->dest, "%d", offset);
+        instruction->type = instruction_type::jcxz;
     }
 
     return byte_index;
@@ -601,45 +646,31 @@ static size_t decode_instruction(
 
 static void print_instruction(instruction *instruction)
 {
-    switch (instruction->type)
+    printf("%s ", InstructionMnemonics[instruction->type]);
+    printf("%s", instruction->dest);
+    if (instruction->src[0] != '\0')
     {
-        case (instruction_type::mov):
-        {
-            printf("mov ");
-        } break;
-        case (instruction_type::add):
-        {
-            printf("add ");
-        } break;
-        case (instruction_type::sub):
-        {
-            printf("sub ");
-        } break;
-        case (instruction_type::cmp):
-        {
-            printf("cmp ");
-        } break;
-    };
-
-    printf("%s, ", instruction->dest);
-    printf("%s\n", instruction->src);
+        printf(", %s", instruction->src);
+    }
 }
 
-static void print_registers(u16 *registers, u8 flags)
+static void print_registers(u16 *registers, u8 flags, u8 ip)
 {
 
-    printf("\nPrinting Registers\n");
-    printf("%s: %d\n", RegisterNames[1][RegisterIndex::ax], registers[RegisterIndex::ax]);
-    printf("%s: %d\n", RegisterNames[1][RegisterIndex::bx], registers[RegisterIndex::bx]);
-    printf("%s: %d\n", RegisterNames[1][RegisterIndex::cx], registers[RegisterIndex::cx]);
-    printf("%s: %d\n", RegisterNames[1][RegisterIndex::dx], registers[RegisterIndex::dx]);
-    printf("%s: %d\n", RegisterNames[1][RegisterIndex::sp], registers[RegisterIndex::sp]);
-    printf("%s: %d\n", RegisterNames[1][RegisterIndex::bp], registers[RegisterIndex::bp]);
-    printf("%s: %d\n", RegisterNames[1][RegisterIndex::si], registers[RegisterIndex::si]);
-    printf("%s: %d\n", RegisterNames[1][RegisterIndex::di], registers[RegisterIndex::di]);
+    printf("\nFinal Registers\n");
+    printf("%s: %d\n", RegisterNames[1][register_index::ax], registers[register_index::ax]);
+    printf("%s: %d\n", RegisterNames[1][register_index::bx], registers[register_index::bx]);
+    printf("%s: %d\n", RegisterNames[1][register_index::cx], registers[register_index::cx]);
+    printf("%s: %d\n", RegisterNames[1][register_index::dx], registers[register_index::dx]);
+    printf("%s: %d\n", RegisterNames[1][register_index::sp], registers[register_index::sp]);
+    printf("%s: %d\n", RegisterNames[1][register_index::bp], registers[register_index::bp]);
+    printf("%s: %d\n", RegisterNames[1][register_index::si], registers[register_index::si]);
+    printf("%s: %d\n", RegisterNames[1][register_index::di], registers[register_index::di]);
 
-    printf("zero flag: %d\n", (flags & InstructionFlag::zero) >> 0);
-    printf("sign flag: %d\n", (flags & InstructionFlag::sign) >> 1);
+    printf("\n");
+    printf("ip: %d\n", ip);
+    printf("zero flag: %d\n", (flags & instruction_flag::zero) >> 0);
+    printf("sign flag: %d\n", (flags & instruction_flag::sign) >> 1);
 }
 
 int main(int argc, char *argv[])
@@ -651,15 +682,22 @@ int main(int argc, char *argv[])
 
     u16 registers[8] = {};
     u8 flags = 0;
+    size_t ip_before = 0;
 
     for (size_t byte_index = 0; byte_index < file_size; byte_index += 2)
     {
         instruction instruction = {};
+        ip_before = byte_index;
+
         byte_index = decode_instruction(buffer, byte_index, &instruction, registers, &flags);
+
         print_instruction(&instruction);
+        printf(" ; ip:%zd->%zd", ip_before, byte_index + 2);
+        printf("\n");
     }
 
-    print_registers(registers, flags);
+    size_t final_ip = ip_before + 2;
+    print_registers(registers, flags, final_ip);
 
     free(buffer);
     
